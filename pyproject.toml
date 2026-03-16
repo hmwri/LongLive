@@ -44,6 +44,10 @@ deployment = [
     "flask",
     "flask-socketio",
 ]
+flash_attn = [
+    "ninja",
+    "packaging",
+]
 optimization = [
     "nvidia-pyindex",
     "nvidia-tensorrt",

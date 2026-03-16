@@ -75,6 +75,37 @@ Notes:
 - optimization-related dependencies such as TensorRT are kept optional
 - if you need those extras, use `uv sync --extra optimization`
 
+## Optional: Flash Attention
+
+This fork can run without `flash-attn`, but it also supports installing it separately.
+
+Basic path:
+
+```bash
+uv sync --extra flash_attn
+uv run bash scripts/install_flash_attn.sh
+```
+
+If you want to require a prebuilt wheel and fail otherwise:
+
+```bash
+uv run bash scripts/install_flash_attn.sh --wheel-only
+```
+
+If you want to try a wheel-friendly torch stack first, you can opt in explicitly:
+
+```bash
+TORCH_SPEC='torch==2.6.*' \
+TORCHVISION_SPEC='torchvision==0.21.*' \
+uv run bash scripts/install_flash_attn.sh --wheel-only
+```
+
+Notes:
+
+- the script does not downgrade torch unless you explicitly pass `TORCH_SPEC`
+- `--wheel-only` is useful when you want to avoid long source builds
+- if `flash-attn` is not installed, the code falls back to SDPA in `wan/modules/attention.py`
+
 ## Model Files
 
 The code expects local weights at the following paths:
