@@ -1,4 +1,6 @@
 __pycache__
+.venv
+*.egg-info/
 
 longlive_models
 wan_models

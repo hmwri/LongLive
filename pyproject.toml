@@ -17,7 +17,7 @@ dependencies = [
     "easydict",
     "einops",
     "ftfy",
-    "git+https://github.com/openai/CLIP.git",
+    "clip @ git+https://github.com/openai/CLIP.git",
     "huggingface_hub[cli]",
     "imageio",
     "imageio-ffmpeg",
