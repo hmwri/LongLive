@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "longlive-fork"
+version = "0.1.0"
+description = "Fork of LongLive with local patches for interactive inference research"
+requires-python = ">=3.10"
+dependencies = [
+    "accelerate>=1.1.1",
+    "av==13.1.0",
+    "datasets",
+    "dashscope",
+    "diffusers==0.31.0",
+    "dominate",
+    "easydict",
+    "einops",
+    "ftfy",
+    "git+https://github.com/openai/CLIP.git",
+    "huggingface_hub[cli]",
+    "imageio",
+    "imageio-ffmpeg",
+    "lmdb",
+    "matplotlib",
+    "omegaconf",
+    "opencv-python>=4.9.0.80",
+    "open_clip_torch",
+    "peft",
+    "pycocotools",
+    "pydantic==2.10.6",
+    "scikit-image",
+    "sentencepiece",
+    "starlette",
+    "tokenizers>=0.20.3",
+    "torchao",
+    "tqdm",
+    "transformers>=4.49.0",
+    "wandb",
+]
+
+[project.optional-dependencies]
+deployment = [
+    "flask",
+    "flask-socketio",
+]
+optimization = [
+    "nvidia-pyindex",
+    "nvidia-tensorrt",
+    "onnx",
+    "onnxconverter_common",
+    "onnxruntime",
+    "onnxscript",
+    "pycuda",
+]
+
+[dependency-groups]
+dev = []
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["model*", "pipeline*", "trainer*", "utils*", "wan*"]

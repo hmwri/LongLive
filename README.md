@@ -58,6 +58,34 @@
 
 Please see our [docs](https://nvlabs.github.io/LongLive/docs) for Installation, Training, and Inference.
 
+## Quick Setup
+
+This fork is intended to be used with `uv`.
+
+```bash
+uv sync
+uv run bash scripts/download_models.sh
+uv run torchrun --nproc_per_node=1 --master_port=29500 interactive_inference.py --config_path configs/longlive_interactive_inference.yaml
+```
+
+Notes:
+
+- `uv sync` installs the fork's Python dependencies
+- `scripts/download_models.sh` downloads the expected weights into `longlive_models/` and `wan_models/`
+- optimization-related dependencies such as TensorRT are kept optional
+- if you need those extras, use `uv sync --extra optimization`
+
+## Model Files
+
+The code expects local weights at the following paths:
+
+- `longlive_models/models/longlive_base.pt`
+- `longlive_models/models/lora.pt`
+- `wan_models/Wan2.1-T2V-1.3B/models_t5_umt5-xxl-enc-bf16.pth`
+- `wan_models/Wan2.1-T2V-1.3B/Wan2.1_VAE.pth`
+
+If the Hugging Face repositories require authentication in your environment, run `hf auth login` first.
+
 ## How to contribute
 - Make sure to have git installed.
 - Create your own [fork](https://github.com/NVlabs/LongLive/fork) of the project.
