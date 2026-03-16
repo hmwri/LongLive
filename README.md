@@ -95,8 +95,8 @@ uv run bash scripts/install_flash_attn.sh --wheel-only
 If you want to try a wheel-friendly torch stack first, you can opt in explicitly:
 
 ```bash
-TORCH_SPEC='torch==2.6.*' \
-TORCHVISION_SPEC='torchvision==0.21.*' \
+TORCH_SPEC='torch==2.8.*' \
+TORCHVISION_SPEC='torchvision==0.23.*' \
 uv run bash scripts/install_flash_attn.sh --wheel-only
 ```
 
@@ -104,6 +104,8 @@ Notes:
 
 - the script does not downgrade torch unless you explicitly pass `TORCH_SPEC`
 - `--wheel-only` is useful when you want to avoid long source builds
+- for `flash-attn` v2.8.3, the available Linux x86_64 wheels include `cp310` through `torch2.8`
+- `torch2.9` wheels in `v2.8.3` are `cp312`-only, so they do not match this repo's current Python 3.10 setup
 - if `flash-attn` is not installed, the code falls back to SDPA in `wan/modules/attention.py`
 
 ## Model Files

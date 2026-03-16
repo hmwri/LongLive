@@ -29,8 +29,8 @@ Examples:
   uv sync --extra flash_attn
   uv run bash scripts/install_flash_attn.sh
 
-  TORCH_SPEC='torch==2.6.*' \
-  TORCHVISION_SPEC='torchvision==0.21.*' \
+  TORCH_SPEC='torch==2.8.*' \
+  TORCHVISION_SPEC='torchvision==0.23.*' \
   uv run bash scripts/install_flash_attn.sh --wheel-only
 EOF
       exit 0
@@ -61,6 +61,7 @@ fi
 
 echo "Python: $("${UV_BIN}" run python -c 'import sys; print(sys.version.split()[0])')"
 echo "Torch: $("${UV_BIN}" run python -c 'import torch; print(torch.__version__)')"
+echo "Note: flash-attn v2.8.3 provides cp310 wheels through torch2.8, while torch2.9 wheels are cp312-only."
 
 if [[ "${WHEEL_ONLY}" -eq 1 ]]; then
   echo "Installing flash-attn from wheel only"
