@@ -72,7 +72,14 @@ else:
 
 
 low_memory = get_cuda_free_memory_gb(device) < 40
+low_memory_override = os.environ.get("LOW_MEMORY")
+if low_memory_override is not None:
+    low_memory = low_memory_override.strip().lower() in {"1", "true", "yes", "on"}
+    print(f"LOW_MEMORY override applied: {low_memory}")
 torch.set_grad_enabled(False)
+
+latent_height = int(getattr(config, "latent_height", 60))
+latent_width = int(getattr(config, "latent_width", 104))
 
 pipeline = InteractiveCausalInferencePipeline(config, device=device)
 
@@ -137,6 +144,8 @@ print("dtype", pipeline.generator.model.dtype)
 pipeline = pipeline.to(dtype=torch.bfloat16)
 if low_memory:
     DynamicSwapInstaller.install_model(pipeline.text_encoder, device=device)
+else:
+    pipeline.text_encoder.to(device=device)
 pipeline.generator.to(device=device)
 pipeline.vae.to(device=device)
 
@@ -188,8 +197,8 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
             config.num_samples,
             config.num_output_frames,
             16,
-            60,
-            104,
+            latent_height,
+            latent_width,
         ],
         device=device,
         dtype=torch.bfloat16,
@@ -200,6 +209,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         text_prompts_list=prompts_list,
         switch_frame_indices=switch_frame_indices,
         return_latents=False,
+        low_memory=low_memory,
     )
 
     current_video = rearrange(video, "b t c h w -> b t h w c").cpu() * 255.0
@@ -230,4 +240,4 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         break
 
 if dist.is_initialized():
-    dist.destroy_process_group() 
+    dist.destroy_process_group()

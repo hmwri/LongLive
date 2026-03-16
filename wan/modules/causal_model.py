@@ -85,7 +85,9 @@ class CausalWanSelfAttention(nn.Module):
             values = [int(local_attn_size)]
         non_neg_vals = [int(v) for v in values if int(v) != -1]
         max_local = max(non_neg_vals) if len(non_neg_vals) > 0 else -1
-        self.max_attention_size = 32760 if max_local == -1 else max_local * 1560
+        self.max_local_attn_size = max_local
+        self.frame_seq_length = 1560
+        self.max_attention_size = 32760 if max_local == -1 else max_local * self.frame_seq_length
         # layers
         self.q = nn.Linear(dim, dim)
         self.k = nn.Linear(dim, dim)
@@ -93,6 +95,14 @@ class CausalWanSelfAttention(nn.Module):
         self.o = nn.Linear(dim, dim)
         self.norm_q = WanRMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
         self.norm_k = WanRMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
+
+    def set_frame_seq_length(self, frame_seq_length: int) -> None:
+        self.frame_seq_length = int(frame_seq_length)
+        self.max_attention_size = (
+            32760
+            if self.max_local_attn_size == -1
+            else self.max_local_attn_size * self.frame_seq_length
+        )
 
     def forward(
         self,

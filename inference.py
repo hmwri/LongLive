@@ -60,10 +60,15 @@ else:
 
 print(f'Free VRAM {get_cuda_free_memory_gb(device)} GB')
 low_memory = get_cuda_free_memory_gb(device) < 40
-low_memory = True
+low_memory_override = os.environ.get("LOW_MEMORY")
+if low_memory_override is not None:
+    low_memory = low_memory_override.strip().lower() in {"1", "true", "yes", "on"}
+    print(f"LOW_MEMORY override applied: {low_memory}")
+
+latent_height = int(getattr(config, "latent_height", 60))
+latent_width = int(getattr(config, "latent_width", 104))
 
 torch.set_grad_enabled(False)
-
 
 # Initialize pipeline
 # Note: checkpoint loading is now handled inside the pipeline __init__ method
@@ -84,13 +89,15 @@ if config.generator_ckpt:
             name = name.replace("_fsdp_wrapped_module.", "")
             return name
 
-        cleaned_state_dict = { _clean_key(k): v for k, v in raw_gen_state_dict.items() }
+
+        cleaned_state_dict = {_clean_key(k): v for k, v in raw_gen_state_dict.items()}
         missing, unexpected = pipeline.generator.load_state_dict(cleaned_state_dict, strict=False)
         if local_rank == 0:
             if len(missing) > 0:
                 print(f"[Warning] {len(missing)} parameters are missing when loading checkpoint: {missing[:8]} ...")
             if len(unexpected) > 0:
-                print(f"[Warning] {len(unexpected)} unexpected parameters encountered when loading checkpoint: {unexpected[:8]} ...")
+                print(
+                    f"[Warning] {len(unexpected)} unexpected parameters encountered when loading checkpoint: {unexpected[:8]} ...")
     else:
         pipeline.generator.load_state_dict(raw_gen_state_dict)
 
@@ -130,11 +137,12 @@ if getattr(config, "adapter", None) and configure_lora_for_model is not None:
 
     pipeline.is_lora_enabled = True
 
-
 # Move pipeline to appropriate dtype and device
 pipeline = pipeline.to(dtype=torch.bfloat16)
 if low_memory:
     DynamicSwapInstaller.install_model(pipeline.text_encoder, device=device)
+else:
+    pipeline.text_encoder.to(device=device)
 pipeline.generator.to(device=device)
 pipeline.vae.to(device=device)
 
@@ -192,7 +200,8 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         prompts = [prompt] * config.num_samples
 
     sampled_noise = torch.randn(
-        [config.num_samples, config.num_output_frames, 16, 60, 104], device=device, dtype=torch.bfloat16
+        [config.num_samples, config.num_output_frames, 16, latent_height, latent_width], device=device,
+        dtype=torch.bfloat16
     )
 
     print("sampled_noise.device", sampled_noise.device)
@@ -235,7 +244,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
             model_type = "ema"
         else:
             model_type = "regular"
-            
+
         for seed_idx in range(config.num_samples):
             # All processes save their videos
             if config.save_with_index:

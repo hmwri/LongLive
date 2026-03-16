@@ -39,11 +39,14 @@ class CausalInferencePipeline(torch.nn.Module):
         # hard code for Wan2.1-T2V-1.3B
         self.num_transformer_blocks = 30
         self.frame_seq_length = 1560
+        if hasattr(self.generator, "set_frame_seq_length"):
+            self.generator.set_frame_seq_length(self.frame_seq_length)
 
         self.kv_cache1 = None
         self.args = args
         self.num_frame_per_block = getattr(args, "num_frame_per_block", 1)
         self.local_attn_size = args.model_kwargs.local_attn_size
+        self._sync_attention_geometry()
 
         # Normalize to list if sequence-like (e.g., OmegaConf ListConfig)
 
@@ -52,6 +55,31 @@ class CausalInferencePipeline(torch.nn.Module):
 
         if self.num_frame_per_block > 1:
             self.generator.model.num_frame_per_block = self.num_frame_per_block
+
+    def _sync_attention_geometry(self) -> None:
+        if hasattr(self.generator, "set_frame_seq_length"):
+            self.generator.set_frame_seq_length(self.frame_seq_length)
+
+        if hasattr(self.generator.model, "local_attn_size"):
+            self.generator.model.local_attn_size = self.local_attn_size
+
+        for _, module in self.generator.model.named_modules():
+            if hasattr(module, "set_frame_seq_length"):
+                module.set_frame_seq_length(self.frame_seq_length)
+            elif hasattr(module, "frame_seq_length"):
+                setattr(module, "frame_seq_length", self.frame_seq_length)
+
+        self._set_all_modules_max_attention_size(self.local_attn_size)
+
+    def _set_frame_geometry(self, height: int, width: int) -> None:
+        patch_size = getattr(self.generator.model, "patch_size", (1, 2, 2))
+        patch_h = int(patch_size[1]) if len(patch_size) > 1 else 1
+        patch_w = int(patch_size[2]) if len(patch_size) > 2 else 1
+        frame_seq_length = (int(height) // patch_h) * (int(width) // patch_w)
+        if hasattr(self.generator.model, "block_mask"):
+            self.generator.model.block_mask = None
+        self.frame_seq_length = frame_seq_length
+        self._sync_attention_geometry()
 
     def inference(
         self,
@@ -74,6 +102,7 @@ class CausalInferencePipeline(torch.nn.Module):
                 It is normalized to be in the range [0, 1].
         """
         batch_size, num_output_frames, num_channels, height, width = noise.shape
+        self._set_frame_geometry(height, width)
         assert num_output_frames % self.num_frame_per_block == 0
         num_blocks = num_output_frames // self.num_frame_per_block
 
@@ -132,9 +161,7 @@ class CausalInferencePipeline(torch.nn.Module):
         )
 
         current_start_frame = 0
-        self.generator.model.local_attn_size = self.local_attn_size
         print(f"[inference] local_attn_size set on model: {self.generator.model.local_attn_size}")
-        self._set_all_modules_max_attention_size(self.local_attn_size)
 
         if profile:
             init_end.record()

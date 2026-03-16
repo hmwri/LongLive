@@ -1,4 +1,5 @@
 # Copyright 2024-2025 The Alibaba Wan Team Authors. All rights reserved.
+import os
 import torch
 
 try:
@@ -27,6 +28,18 @@ __all__ = [
     'flash_attention',
     'attention',
 ]
+
+DISABLE_FLASH_ATTN = os.getenv("DISABLE_FLASH_ATTN", "").lower() in {"1", "true", "yes", "on"}
+
+
+def _sdpa_attention(q, k, v, dropout_p=0.0, causal=False, dtype=torch.bfloat16):
+    q = q.transpose(1, 2).to(dtype)
+    k = k.transpose(1, 2).to(dtype)
+    v = v.transpose(1, 2).to(dtype)
+    out = torch.nn.functional.scaled_dot_product_attention(
+        q, k, v, attn_mask=None, is_causal=causal, dropout_p=dropout_p
+    )
+    return out.transpose(1, 2).contiguous()
 
 
 def flash_attention(
@@ -60,6 +73,13 @@ def flash_attention(
     half_dtypes = (torch.float16, torch.bfloat16)
     assert dtype in half_dtypes
     assert q.device.type == 'cuda' and q.size(-1) <= 256
+
+    if DISABLE_FLASH_ATTN:
+        if q_lens is not None or k_lens is not None:
+            warnings.warn(
+                'Padding mask is disabled when using scaled_dot_product_attention. It can have a significant impact on performance.'
+            )
+        return _sdpa_attention(q, k, v, dropout_p=dropout_p, causal=causal, dtype=dtype).type(q.dtype)
 
     # params
     b, lq, lk, out_dtype = q.size(0), q.size(1), k.size(1), q.dtype
@@ -151,7 +171,7 @@ def attention(
     dtype=torch.bfloat16,
     fa_version=None,
 ):
-    if FLASH_ATTN_2_AVAILABLE or FLASH_ATTN_3_AVAILABLE:
+    if not DISABLE_FLASH_ATTN and (FLASH_ATTN_2_AVAILABLE or FLASH_ATTN_3_AVAILABLE):
         return flash_attention(
             q=q,
             k=k,
@@ -172,14 +192,4 @@ def attention(
             warnings.warn(
                 'Padding mask is disabled when using scaled_dot_product_attention. It can have a significant impact on performance.'
             )
-        attn_mask = None
-
-        q = q.transpose(1, 2).to(dtype)
-        k = k.transpose(1, 2).to(dtype)
-        v = v.transpose(1, 2).to(dtype)
-
-        out = torch.nn.functional.scaled_dot_product_attention(
-            q, k, v, attn_mask=attn_mask, is_causal=causal, dropout_p=dropout_p)
-
-        out = out.transpose(1, 2).contiguous()
-        return out
+        return _sdpa_attention(q, k, v, dropout_p=dropout_p, causal=causal, dtype=dtype)

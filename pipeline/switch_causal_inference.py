@@ -33,6 +33,8 @@ class SwitchCausalInferencePipeline(CausalInferencePipeline):
 
     # Internal helpers
     def _recache_after_switch(self, output, current_start_frame, new_conditional_dict):
+        self._set_frame_geometry(output.shape[-2], output.shape[-1])
+
         if not self.global_sink:
             # reset kv cache
             for block_idx in range(self.num_transformer_blocks):
@@ -113,6 +115,7 @@ class SwitchCausalInferencePipeline(CausalInferencePipeline):
             switch_frame_index: 0-based frame index; frames >= this value use the second prompt
         """
         batch_size, num_output_frames, num_channels, height, width = noise.shape
+        self._set_frame_geometry(height, width)
         assert num_output_frames % self.num_frame_per_block == 0
         num_blocks = num_output_frames // self.num_frame_per_block
 
@@ -160,9 +163,7 @@ class SwitchCausalInferencePipeline(CausalInferencePipeline):
 
         num_input_frames = initial_latent.shape[1] if initial_latent is not None else 0
         current_start_frame = 0
-        self.generator.model.local_attn_size = self.local_attn_size
         print(f"[inference] local_attn_size set on model: {self.generator.model.local_attn_size}")
-        self._set_all_modules_max_attention_size(self.local_attn_size)
 
         # Temporal denoising by blocks
         all_num_frames = [self.num_frame_per_block] * num_blocks
@@ -229,4 +230,4 @@ class SwitchCausalInferencePipeline(CausalInferencePipeline):
 
         if return_latents:
             return video, output
-        return video 
+        return video

@@ -27,24 +27,20 @@ class WanTextEncoder(torch.nn.Module):
             torch.load("wan_models/Wan2.1-T2V-1.3B/models_t5_umt5-xxl-enc-bf16.pth",
                        map_location='cpu', weights_only=False)
         )
-        
-        # Move text encoder to GPU if available
-        if torch.cuda.is_available():
-            self.text_encoder = self.text_encoder.cuda()
 
         self.tokenizer = HuggingfaceTokenizer(
             name="wan_models/Wan2.1-T2V-1.3B/google/umt5-xxl/", seq_len=512, clean='whitespace')
 
     @property
     def device(self):
-        # Assume we are always on GPU
-        return torch.cuda.current_device()
+        return self.text_encoder.token_embedding.weight.device
 
     def forward(self, text_prompts: List[str]) -> dict:
         ids, mask = self.tokenizer(
             text_prompts, return_mask=True, add_special_tokens=True)
-        ids = ids.to(self.device)
-        mask = mask.to(self.device)
+        device = self.device
+        ids = ids.to(device)
+        mask = mask.to(device)
         seq_lens = mask.gt(0).sum(dim=1).long()
         context = self.text_encoder(ids, mask)
         # ids = ids.to(torch.device('cpu'))
@@ -199,9 +195,20 @@ class WanDiffusionWrapper(torch.nn.Module):
         )
         self.scheduler.set_timesteps(1000, training=True)
 
-        # self.seq_len = 1560 * local_attn_size if local_attn_size != -1 else 32760 # [1, 21, 16, 60, 104]
-        self.seq_len = 1560 * local_attn_size if local_attn_size > 21 else 32760 # [1, 21, 16, 60, 104]
+        self.frame_seq_length = 1560
+        self.local_attn_size = local_attn_size
+        self._update_seq_len()
         self.post_init()
+
+    def _update_seq_len(self) -> None:
+        if self.local_attn_size > 21:
+            self.seq_len = self.frame_seq_length * int(self.local_attn_size)
+        else:
+            self.seq_len = 32760
+
+    def set_frame_seq_length(self, frame_seq_length: int) -> None:
+        self.frame_seq_length = int(frame_seq_length)
+        self._update_seq_len()
 
     def enable_gradient_checkpointing(self) -> None:
         self.model.enable_gradient_checkpointing()
